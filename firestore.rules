@@ -1,0 +1,38 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Each user's habits are stored under their Firebase Authentication UID.
+    match /users/{userId}/habits/{habitId} {
+      function isOwner() {
+        return request.auth != null && request.auth.uid == userId;
+      }
+
+      function hasValidHabitShape(data) {
+        return data.keys().hasAll([
+            'title', 'description', 'color', 'createdAt', 'updatedAt', 'completedDates'
+          ])
+          && data.keys().hasOnly([
+            'title', 'description', 'color', 'createdAt', 'updatedAt', 'completedDates'
+          ])
+          && data.title is string
+          && data.title.size() > 0
+          && data.title.size() <= 80
+          && data.description is string
+          && data.description.size() <= 240
+          && data.color in ['#6E8B74', '#C98F72', '#8B83B5', '#D2A94B', '#6D93A6']
+          && data.createdAt is timestamp
+          && data.updatedAt is timestamp
+          && data.completedDates is list
+          && data.completedDates.size() <= 3650;
+      }
+
+      allow read: if isOwner();
+      allow create: if isOwner() && hasValidHabitShape(request.resource.data);
+      allow update: if isOwner()
+        && hasValidHabitShape(request.resource.data)
+        && request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if isOwner();
+    }
+  }
+}
